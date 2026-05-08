@@ -1,0 +1,47 @@
+{
+  "accuracy": 99.42,
+  "total_samples": 518,
+  "correct": 515,
+  "avg_latency_ms": 419.3,
+  "p50_latency_ms": 395.1,
+  "p95_latency_ms": 546.9,
+  "per_class": {
+    "benign": {
+      "accuracy": 100.0,
+      "correct": 250,
+      "total": 250
+    },
+    "adversarial": {
+      "accuracy": 98.88,
+      "correct": 265,
+      "total": 268
+    }
+  },
+  "per_attack_type": {
+    "none": {
+      "accuracy": 100.0,
+      "correct": 250,
+      "total": 250
+    },
+    "gcg": {
+      "accuracy": 98.44,
+      "correct": 189,
+      "total": 192
+    },
+    "pair": {
+      "accuracy": 100.0,
+      "correct": 46,
+      "total": 46
+    },
+    "autodan": {
+      "accuracy": 100.0,
+      "correct": 30,
+      "total": 30
+    }
+  },
+  "confusion_matrix": {
+    "benign_as_benign": 250,
+    "adversarial_as_adversarial": 265,
+    "adversarial_as_benign": 3
+  }
+}

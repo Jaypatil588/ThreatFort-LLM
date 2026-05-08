@@ -1,0 +1,38 @@
+{
+  "prompt-guard-22m": {
+    "model": "prompt-guard-22m",
+    "description": "Meta Llama Prompt Guard 2 (22M params)",
+    "accuracy": 70.0,
+    "precision": 100.0,
+    "recall": 40.0,
+    "f1": 57.14,
+    "avg_latency_ms": 109.52,
+    "p95_latency_ms": 184.23,
+    "confusion_matrix": {
+      "tp": 6,
+      "fp": 0,
+      "fn": 9,
+      "tn": 15
+    },
+    "total_samples": 30,
+    "errors": 0
+  },
+  "prompt-guard-86m": {
+    "model": "prompt-guard-86m",
+    "description": "Meta Llama Prompt Guard 2 (86M params)",
+    "accuracy": 76.67,
+    "precision": 100.0,
+    "recall": 53.33,
+    "f1": 69.57,
+    "avg_latency_ms": 117.29,
+    "p95_latency_ms": 133.45,
+    "confusion_matrix": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 7,
+      "tn": 15
+    },
+    "total_samples": 30,
+    "errors": 0
+  }
+}

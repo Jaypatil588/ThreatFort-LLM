@@ -1,0 +1,38 @@
+{
+  "accuracy": 95.63,
+  "total": 4740,
+  "correct": 4533,
+  "avg_latency_ms": 374.4,
+  "p95_latency_ms": 533.0,
+  "per_class": {
+    "benign": {
+      "accuracy": 96.19,
+      "correct": 4391,
+      "total": 4565
+    },
+    "adversarial": {
+      "accuracy": 81.14,
+      "correct": 142,
+      "total": 175
+    }
+  },
+  "per_source": {
+    "toxic_chat": {
+      "accuracy": 96.16,
+      "correct": 4462,
+      "total": 4640
+    },
+    "simple_safety_tests": {
+      "accuracy": 71.0,
+      "correct": 71,
+      "total": 100
+    }
+  },
+  "confusion": {
+    "benign_as_benign": 4391,
+    "benign_as_adversarial": 166,
+    "adversarial_as_adversarial": 142,
+    "adversarial_as_benign": 33,
+    "benign_as_unknown": 8
+  }
+}

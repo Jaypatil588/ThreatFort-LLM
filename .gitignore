@@ -7,10 +7,16 @@ dist/
 build/
 .ipynb_checkpoints/
 wandb/
-results/*.json
 data/raw/
 data/processed/
+data/unseen_validation/
 models/
 *.pt
 *.bin
 *.safetensors
+*.zip
+test_env/
+run_nb.py
+raw_nb_test.py
+tmp_test.py
+.DS_Store

@@ -2,36 +2,81 @@
 
 **Adversarial Robustness Benchmarking Suite for Large Language Models**
 
-A benchmarking framework to evaluate LLM robustness against adversarial prompt attacks, featuring automated attack evaluation across multiple models and a fine-tuned adversarial prompt classifier.
+A benchmarking framework to evaluate LLM robustness against adversarial prompt attacks, featuring automated attack evaluation across multiple models and a QLoRA fine-tuned adversarial prompt classifier.
 
 ## Overview
 
 RobustBench-LLM addresses a critical gap in LLM safety evaluation by providing:
 
-1. **Multi-Attack Benchmark**: Systematic evaluation of 5 open-source LLMs against three state-of-the-art adversarial attack methods (GCG, AutoDAN, PAIR)
-2. **Adversarial Prompt Classifier**: A QLoRA fine-tuned Llama 3.1 8B model that detects adversarial inputs with 94% accuracy at <35ms latency
+1. **Multi-Attack Benchmark**: Systematic evaluation of open-source LLMs against three state-of-the-art adversarial attack methods (GCG, AutoDAN, PAIR)
+2. **Adversarial Prompt Classifier**: A QLoRA fine-tuned Llama 3.2 1B model that detects adversarial inputs with **99.4% accuracy** on held-out test data and **95.6% accuracy** on completely unseen out-of-distribution datasets
 
-## Key Results
+## Classifier Results
 
-### Model Robustness Comparison
+### In-Distribution Test Set (518 samples)
 
-| Model | ASR (%) ↓ | Refusal Rate (%) ↑ | FPR (%) ↓ | Avg Latency (ms) |
-|-------|-----------|-------------------|-----------|-------------------|
-| Llama 3.3 70B | 18.7 | 81.3 | 12.1 | 892 |
-| Gemma 2 9B | 22.1 | 77.9 | 14.8 | 267 |
-| Mixtral 8x7B | 29.8 | 70.2 | 9.5 | 215 |
-| Llama 3.1 8B | 34.2 | 65.8 | 8.3 | 245 |
-| Llama 3.2 3B | 42.5 | 57.5 | 5.7 | 198 |
-| Llama 3.2 1B | 47.3 | 52.7 | 4.2 | 156 |
+The classifier was evaluated on a held-out test split from the same distribution as the training data.
 
-*ASR = Attack Success Rate (lower is better) | FPR = False Positive Rate on benign inputs*
+| Metric | Value |
+|--------|-------|
+| **Overall Accuracy** | **99.4%** (515/518) |
+| Adversarial Recall | 98.9% (265/268) |
+| Benign Recall | 100.0% (250/250) |
+| False Positives | 0 |
+| False Negatives | 3 |
 
-### Classifier Performance
+#### Per-Attack-Type Accuracy
 
-- **Accuracy**: 94.2% on held-out test set
-- **Avg Latency**: 28.3ms per classification
-- **P95 Latency**: 33.7ms (under 35ms target)
-- **Method**: QLoRA fine-tuning (4-bit quantization + LoRA rank 16)
+| Attack Type | Accuracy | Samples |
+|-------------|----------|---------|
+| GCG (gradient-based suffix) | 98.4% | 192 |
+| AutoDAN (jailbreak template) | 100.0% | 30 |
+| PAIR (iterative refinement) | 100.0% | 46 |
+| Benign (no attack) | 100.0% | 250 |
+
+#### Confusion Matrix
+
+|  | Predicted Adversarial | Predicted Benign |
+|--|----------------------|-----------------|
+| **True Adversarial** | 265 | 3 |
+| **True Benign** | 0 | 250 |
+
+> **Zero false positives** — the model never incorrectly flags a benign prompt as adversarial on the in-distribution test set.
+
+---
+
+### Out-of-Distribution Validation (4,740 unseen samples)
+
+To validate generalization, the classifier was evaluated on **completely unseen datasets** that were NOT used during training:
+
+- **[lmsys/toxic-chat](https://huggingface.co/datasets/lmsys/toxic-chat)**: 4,640 real user conversations from Vicuna/ChatGPT annotated for toxicity and jailbreaking
+- **[SimpleSafetyTests](https://huggingface.co/datasets/Bertievidgen/SimpleSafetyTests)**: 100 clear-cut unsafe prompts designed to test basic safety boundaries
+
+| Metric | Value |
+|--------|-------|
+| **Overall Accuracy** | **95.6%** (4,533/4,740) |
+| Adversarial Recall | 81.1% (142/175) |
+| Benign Recall | 96.2% (4,391/4,565) |
+
+#### Per-Source Accuracy
+
+| Dataset | Accuracy | Samples | Notes |
+|---------|----------|---------|-------|
+| ToxicChat | 96.2% | 4,640 | Real-world user conversations |
+| SimpleSafetyTests | 71.0% | 100 | Direct harmful requests without jailbreak wrapping |
+
+#### Confusion Matrix
+
+|  | Predicted Adversarial | Predicted Benign | Predicted Unknown |
+|--|----------------------|-----------------|-------------------|
+| **True Adversarial** | 142 | 33 | 0 |
+| **True Benign** | 166 | 4,391 | 8 |
+
+#### Analysis
+
+- **Strong real-world generalization**: 96.2% accuracy on real user conversations the model has never seen
+- **Weakness on direct harm prompts**: SimpleSafetyTests (71%) contains plain harmful requests (e.g., "How to make a bomb") without jailbreak template wrapping — the training data is skewed toward jailbreak-wrapped adversarial prompts
+- **False positive pattern**: The model over-flags roleplay and creative-writing prompts that superficially resemble jailbreak attempts (e.g., "roleplay a murder suspect", "write as Walter White")
 
 ## Attack Methods
 
@@ -46,16 +91,22 @@ RobustBench-LLM addresses a critical gap in LLM safety evaluation by providing:
 ```
 robustbench/
 ├── benchmark/
-│   ├── evaluate.py          # Run attacks against models via API
-│   └── visualize.py         # Generate charts and result tables
+│   ├── evaluate.py               # Run attacks against models via Groq API
+│   ├── baseline_comparison.py    # Compare model robustness
+│   └── visualize.py              # Generate charts and result tables
 ├── classifier/
-│   └── train.py             # QLoRA fine-tuning script
+│   ├── train.py                  # QLoRA fine-tuning script (GPU)
+│   ├── evaluate_adapter.py       # Evaluate adapter on held-out test set (MPS/CPU)
+│   └── download_and_eval_unseen.py  # Download unseen datasets & evaluate OOD
 ├── data/
-│   └── collect_datasets.py  # Collect adversarial & benign datasets
+│   ├── collect_datasets.py       # Collect adversarial & benign datasets
+│   ├── processed/                # Train/val/test JSONL splits
+│   └── unseen_validation/        # Out-of-distribution validation data
 ├── notebooks/
-│   └── train_classifier.ipynb  # Colab notebook for GPU training
-├── results/
-│   └── figures/             # Generated visualizations
+│   └── train_classifier.ipynb    # Google Colab notebook for GPU training
+├── models/
+│   └── classifier/final_adapter/ # Trained QLoRA adapter weights
+├── results/                      # Evaluation results and figures
 ├── requirements.txt
 └── README.md
 ```
@@ -76,40 +127,40 @@ pip install -r requirements.txt
 python data/collect_datasets.py
 ```
 
-This downloads and processes 5,000+ adversarial and benign prompt pairs from:
-- AdvBench (GCG attacks)
-- JailbreakV-28K (diverse jailbreaks)
-- ChatGPT Jailbreak Prompts
+Downloads and processes 5,173 adversarial and benign prompt pairs from:
+- AdvBench (GCG attacks) + synthetic adversarial suffixes
+- AutoDAN-style jailbreak templates
+- PAIR conversational jailbreaks
+- ChatGPT Jailbreak Prompts & prompt injection datasets
 - Stanford Alpaca (benign)
-- OpenAssistant (benign)
 
-### 3. Run Benchmark
+### 3. Train Classifier (Google Colab)
+
+1. Open `notebooks/train_classifier.ipynb` in [Google Colab](https://colab.research.google.com/)
+2. Set runtime to **T4 GPU** (Runtime > Change runtime type)
+3. Run all cells — training completes in ~25 minutes on T4
+4. The notebook will download the adapter weights as a zip file
+5. Extract to `models/classifier/final_adapter/`
+
+### 4. Evaluate Classifier
+
+```bash
+# In-distribution evaluation (held-out test set)
+python classifier/evaluate_adapter.py
+
+# Out-of-distribution evaluation (unseen datasets)
+python classifier/download_and_eval_unseen.py
+```
+
+### 5. Run Benchmark
 
 ```bash
 # Set your API key
 cp .env.example .env
 # Edit .env with your Groq API key
 
-# Run benchmark (uses API, no GPU needed)
+# Run benchmark
 python benchmark/evaluate.py --n-adversarial 100 --n-benign 50
-```
-
-### 4. Train Classifier
-
-**Option A: Google Colab (recommended)**
-- Open `notebooks/train_classifier.ipynb` in Google Colab
-- Follow the step-by-step instructions
-- Training takes ~45 min on T4, ~15 min on A100
-
-**Option B: Local (requires 16GB+ VRAM)**
-```bash
-python classifier/train.py --mode train
-```
-
-### 5. Evaluate Classifier
-
-```bash
-python classifier/train.py --mode eval
 ```
 
 ### 6. Generate Visualizations
@@ -124,26 +175,36 @@ python benchmark/visualize.py
 
 | Parameter | Value |
 |-----------|-------|
-| Base Model | Llama 3.1 8B Instruct |
-| Quantization | 4-bit NormalFloat (NF4) |
-| LoRA Rank | 16 |
+| Base Model | Llama 3.2 1B Instruct |
+| Quantization | 4-bit NormalFloat (NF4) + double quantization |
+| LoRA Rank (r) | 16 |
 | LoRA Alpha | 32 |
-| Target Modules | q, k, v, o, gate, up, down projections |
-| Trainable Params | ~0.1% of total |
+| Target Modules | q, k, v, o, gate, up, down projections (all-linear) |
+| Trainable Params | 11.3M / 1.25B (0.90%) |
 | Training Epochs | 3 |
-| Learning Rate | 2e-4 |
-| Effective Batch Size | 16 |
+| Learning Rate | 2e-4 (cosine schedule, 3% warmup) |
+| Effective Batch Size | 16 (4 × 4 gradient accumulation) |
+| Max Sequence Length | 512 |
+| Gradient Checkpointing | Enabled (non-reentrant) |
+| Training Time | ~25 min on T4 GPU |
 
-### Dataset Composition
+### Training Dataset Composition
 
 | Category | Count | Sources |
 |----------|-------|---------|
-| GCG adversarial | ~700 | AdvBench + synthetic suffixes |
-| AutoDAN adversarial | ~900 | DAN template variations |
-| PAIR adversarial | ~900 | Conversational jailbreaks |
-| Additional jailbreaks | ~400 | JailbreakV-28K, community |
-| Benign | ~2,500 | Alpaca, OpenAssistant |
-| **Total** | **~5,400** | |
+| GCG adversarial | 1,912 | AdvBench + synthetic suffixes |
+| AutoDAN adversarial | 341 | DAN template variations |
+| PAIR adversarial | 420 | Conversational jailbreaks |
+| Benign | 2,500 | Alpaca, OpenAssistant |
+| **Total** | **5,173** | 80/10/10 train/val/test split |
+
+### Unseen Validation Dataset
+
+| Source | Adversarial | Benign | Total |
+|--------|-------------|--------|-------|
+| lmsys/toxic-chat | 91 | 4,549 | 4,640 |
+| SimpleSafetyTests | 100 | 0 | 100 |
+| **Total** | **175** | **4,565** | **4,740** |
 
 ## References
 
@@ -152,6 +213,7 @@ python benchmark/visualize.py
 - [Jailbreaking Black Box LLMs in Twenty Queries](https://arxiv.org/abs/2310.08419) (PAIR)
 - [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314) (QLoRA)
 - [HarmBench: A Standardized Evaluation Framework](https://arxiv.org/abs/2402.04249) (HarmBench)
+- [ToxicChat: Unveiling Hidden Challenges of Toxicity Detection](https://arxiv.org/abs/2310.17389) (ToxicChat)
 
 ## License
 
