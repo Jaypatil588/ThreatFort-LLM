@@ -115,7 +115,7 @@ from google.colab import files
 model.save_pretrained('./classifier_adapter')
 tokenizer.save_pretrained('./classifier_adapter')
 
-with open('./classifier_adapter/robustbench_config.json', 'w') as f:
+with open('./classifier_adapter/threatfort_config.json', 'w') as f:
     json.dump({'model_id': MODEL_ID, 'model_type': MODEL_TYPE}, f)
 
 shutil.make_archive('classifier_adapter', 'zip', './classifier_adapter')

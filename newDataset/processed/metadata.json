@@ -1,0 +1,27 @@
+{
+  "total_samples": 5173,
+  "label_distribution": {
+    "adversarial": 2673,
+    "benign": 2500
+  },
+  "attack_distribution": {
+    "gcg": 1912,
+    "autodan": 341,
+    "pair": 420,
+    "none": 2500
+  },
+  "split_sizes": {
+    "train": 4138,
+    "val": 517,
+    "test": 518
+  },
+  "sources": [
+    "pair_synthetic",
+    "prompt_injections",
+    "autodan_synthetic",
+    "chatgpt_jailbreaks",
+    "alpaca",
+    "advbench",
+    "advbench_suffixed"
+  ]
+}

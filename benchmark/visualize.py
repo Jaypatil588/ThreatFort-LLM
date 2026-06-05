@@ -1,5 +1,5 @@
 """
-Results Visualization for RobustBench-LLM
+Results Visualization for ThreatFort-LLM
 
 Generates publication-quality charts and tables from benchmark results.
 This creates the visual outputs you'd show in a README, paper, or portfolio.
@@ -309,7 +309,7 @@ def main():
     # Generate markdown table
     table = generate_markdown_table(results)
     with open(RESULTS_DIR / "results_table.md", "w") as f:
-        f.write("# RobustBench-LLM Results\n\n")
+        f.write("# ThreatFort-LLM Results\n\n")
         f.write("## Model Robustness Comparison\n\n")
         f.write(table)
         f.write("\n\n*ASR = Attack Success Rate (lower is better)*\n")

@@ -1,4 +1,4 @@
-# RobustBench-LLM
+# ThreatFort-LLM
 
 **Adversarial Robustness Benchmarking Suite for Large Language Models**
 
@@ -6,7 +6,7 @@ A benchmarking framework to evaluate LLM robustness against adversarial prompt a
 
 ## Overview
 
-RobustBench-LLM addresses a critical gap in LLM safety evaluation by providing:
+ThreatFort-LLM addresses a critical gap in LLM safety evaluation by providing:
 
 1. **Multi-Attack Benchmark**: Systematic evaluation of open-source LLMs against three state-of-the-art adversarial attack methods (GCG, AutoDAN, PAIR)
 2. **Adversarial Prompt Classifier**: A QLoRA fine-tuned Llama 3.2 1B model that detects adversarial inputs with **99.4% accuracy** on held-out test data and **95.6% accuracy** on completely unseen out-of-distribution datasets
@@ -89,7 +89,7 @@ To validate generalization, the classifier was evaluated on **completely unseen 
 ## Project Structure
 
 ```
-robustbench/
+threatfort/
 ├── benchmark/
 │   ├── evaluate.py               # Run attacks against models via Groq API
 │   ├── baseline_comparison.py    # Compare model robustness

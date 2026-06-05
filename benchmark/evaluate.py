@@ -378,7 +378,7 @@ def run_full_benchmark(
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Run RobustBench-LLM benchmark")
+    parser = argparse.ArgumentParser(description="Run ThreatFort-LLM benchmark")
     parser.add_argument("--n-adversarial", type=int, default=100,
                        help="Number of adversarial samples to test")
     parser.add_argument("--n-benign", type=int, default=50,
