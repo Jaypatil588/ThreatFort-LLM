@@ -12,8 +12,8 @@ What this measures:
   - Response latency per model
 
 Usage:
-  python benchmark/evaluate.py
-  python benchmark/evaluate.py --n-adversarial 50 --n-benign 25  # Smaller run
+  python3 benchmark/evaluate.py
+  python3 benchmark/evaluate.py --n-adversarial 50 --n-benign 25  # Smaller run
 """
 
 import json
@@ -44,7 +44,7 @@ GROQ_MODELS = {
 GROQ_DELAY = 2.5      # ~24 RPM to stay under 30 RPM limit
 
 RESULTS_DIR = Path(__file__).parent.parent / "results"
-DATA_DIR = Path(__file__).parent.parent / "data" / "processed"
+DATA_DIR = Path(__file__).parent.parent / "newDataset" / "processed"
 
 # ─── API Client ──────────────────────────────────────────────────────────────
 
@@ -59,39 +59,27 @@ def get_client() -> Groq:
     return Groq(api_key=api_key)
 
 
-def query_model(client: Groq, model_id: str, prompt: str, max_retries: int = 3) -> dict:
+def query_model(client: Groq, model_id: str, prompt: str) -> dict:
     """
     Send a prompt to a model and get the response.
     Returns dict with response text, latency, and whether the model refused.
     """
-    for attempt in range(max_retries):
-        try:
-            start_time = time.time()
-            response = client.chat.completions.create(
-                model=model_id,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=512,
-                temperature=0.0,  # Deterministic for reproducibility
-            )
-            latency = time.time() - start_time
-            
-            text = response.choices[0].message.content or ""
-            return {
-                "response": text,
-                "latency_ms": round(latency * 1000, 2),
-                "error": None
-            }
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # exponential backoff
-            else:
-                return {
-                    "response": "",
-                    "latency_ms": 0,
-                    "error": str(e)
-                }
+    start_time = time.time()
+    response = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=512,
+        temperature=0.0,
+    )
+    latency = time.time() - start_time
+    
+    text = response.choices[0].message.content or ""
+    return {
+        "response": text,
+        "latency_ms": round(latency * 1000, 2),
+    }
 
 
 # ─── Response Judging ────────────────────────────────────────────────────────
@@ -180,7 +168,7 @@ def load_test_data(n_adversarial: int = 100, n_benign: int = 50) -> list[dict]:
     test_path = DATA_DIR / "test.jsonl"
     if not test_path.exists():
         raise FileNotFoundError(
-            f"Test data not found at {test_path}. Run data/collect_datasets.py first."
+            f"Test data not found at {test_path}. Prepare newDataset/processed/test.jsonl first."
         )
     
     all_data = []
@@ -231,17 +219,6 @@ def benchmark_model(
         # Query the model
         response = query_model(client, model_id, sample["prompt"])
         
-        if response["error"]:
-            errors += 1
-            results.append({
-                **sample,
-                "response": "",
-                "latency_ms": 0,
-                "error": response["error"],
-                "judgment": {"refused": True, "attack_success": False}
-            })
-            continue
-        
         # Judge the response
         judgment = judge_response(
             sample["prompt"], 
@@ -253,7 +230,6 @@ def benchmark_model(
             **sample,
             "response": response["response"][:500],  # Truncate for storage
             "latency_ms": response["latency_ms"],
-            "error": None,
             "judgment": judgment,
         })
         
@@ -331,12 +307,8 @@ def run_full_benchmark(
     all_results = {}
     
     for model_name, model_id in models.items():
-        try:
-            result = benchmark_model(client, model_name, model_id, test_data, delay=delay)
-            all_results[model_name] = result
-        except Exception as e:
-            print(f"  ERROR on {model_name}: {e}")
-            all_results[model_name] = {"error": str(e)}
+        result = benchmark_model(client, model_name, model_id, test_data, delay=delay)
+        all_results[model_name] = result
     
     # Save results
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -392,4 +364,3 @@ if __name__ == "__main__":
         models = {k: v for k, v in GROQ_MODELS.items() if k in args.models}
     
     run_full_benchmark(args.n_adversarial, args.n_benign, models)
-

@@ -29,7 +29,7 @@ else:
 
 PROJECT_ROOT = Path(__file__).parent.parent
 ADAPTER_PATH = PROJECT_ROOT / "models" / "classifier" / "final_adapter"
-TEST_PATH    = PROJECT_ROOT / "data" / "processed" / "test.jsonl"
+TEST_PATH    = PROJECT_ROOT / "newDataset" / "processed" / "test.jsonl"
 
 # ─── Inference template (matches training format) ────────────────────────────
 

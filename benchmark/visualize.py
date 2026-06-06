@@ -243,7 +243,7 @@ def plot_classifier_performance():
         linewidths=2, linecolor="white",
         annot_kws={"size": 16, "fontweight": "bold"},
     )
-    axes[0].set_title("Confusion Matrix\n(Fine-tuned Llama 3.1 8B Classifier)",
+    axes[0].set_title("Confusion Matrix\n(Fine-tuned Llama 3.2 3B Classifier)",
                       fontsize=13, fontweight="bold")
     
     # Latency Distribution

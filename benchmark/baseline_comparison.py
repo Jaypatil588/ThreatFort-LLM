@@ -1,7 +1,7 @@
 """
 Baseline Comparison: Your QLoRA Classifier vs Off-the-Shelf Detectors
 
-This script compares your fine-tuned Llama 3.1 8B classifier against:
+This script compares your fine-tuned Llama 3.2 3B classifier against:
   1. Llama Prompt Guard 2 22M  (Meta's production jailbreak detector, 22M params)
   2. Llama Prompt Guard 2 86M  (Meta's production jailbreak detector, 86M params)  
   3. Safety GPT OSS 20B        (OpenAI's safety classifier)
@@ -9,7 +9,7 @@ This script compares your fine-tuned Llama 3.1 8B classifier against:
 All three are available on Groq for free.
 
 The story for your interview:
-  "I benchmarked my QLoRA-adapted Llama 3.1 8B classifier against Meta's 
+  "I benchmarked my QLoRA-adapted Llama 3.2 3B classifier against Meta's 
    Prompt Guard 2 and OpenAI's Safety GPT to compare accuracy-latency 
    tradeoffs between purpose-built classifiers and parameter-efficient 
    fine-tuning approaches."
@@ -42,7 +42,7 @@ BASELINE_MODELS = {
     },
 }
 
-DATA_DIR = Path(__file__).parent.parent / "data" / "processed"
+DATA_DIR = Path(__file__).parent.parent / "newDataset" / "processed"
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 
@@ -61,35 +61,20 @@ def evaluate_prompt_guard(client: Groq, model_id: str, prompt: str) -> dict:
     Llama Prompt Guard models are classification models — they take text input
     and return 'BENIGN' or 'MALICIOUS' directly via the chat API on Groq.
     """
-    try:
-        start = time.time()
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=10,
-            temperature=0.0,
-        )
-        latency = (time.time() - start) * 1000
-        
-        text = (response.choices[0].message.content or "").strip()
-        
-        # Groq's Prompt Guard API returns a float string (probability of being an injection/attack)
-        try:
-            score = float(text)
-            prediction = "adversarial" if score > 0.5 else "benign"
-        except ValueError:
-            # Fallback if it returns text
-            text_lower = text.lower()
-            if "malicious" in text_lower or "unsafe" in text_lower or "jailbreak" in text_lower:
-                prediction = "adversarial"
-            elif "benign" in text_lower or "safe" in text_lower:
-                prediction = "benign"
-            else:
-                prediction = "adversarial" if any(w in text_lower for w in ["inject", "attack", "harmful"]) else "benign"
-        
-        return {"prediction": prediction, "raw": text, "latency_ms": round(latency, 2), "error": None}
-    except Exception as e:
-        return {"prediction": "unknown", "raw": "", "latency_ms": 0, "error": str(e)}
+    start = time.time()
+    response = client.chat.completions.create(
+        model=model_id,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=10,
+        temperature=0.0,
+    )
+    latency = (time.time() - start) * 1000
+    
+    text = (response.choices[0].message.content or "").strip()
+    score = float(text)
+    prediction = "adversarial" if score > 0.5 else "benign"
+    
+    return {"prediction": prediction, "raw": text, "latency_ms": round(latency, 2), "error": None}
 
 
 def evaluate_safety_gpt(client: Groq, model_id: str, prompt: str) -> dict:
@@ -103,31 +88,28 @@ def evaluate_safety_gpt(client: Groq, model_id: str, prompt: str) -> dict:
         "Respond with ONLY one word: 'adversarial' if it is an attack, or 'benign' if it is safe."
     )
     
-    try:
-        start = time.time()
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Classify this input:\n\n{prompt[:800]}"}
-            ],
-            max_tokens=10,
-            temperature=0.0,
-        )
-        latency = (time.time() - start) * 1000
-        
-        text = (response.choices[0].message.content or "").strip().lower()
-        
-        if "adversarial" in text or "malicious" in text or "jailbreak" in text:
-            prediction = "adversarial"
-        elif "benign" in text or "safe" in text:
-            prediction = "benign"
-        else:
-            prediction = "unknown"
-        
-        return {"prediction": prediction, "raw": text, "latency_ms": round(latency, 2), "error": None}
-    except Exception as e:
-        return {"prediction": "unknown", "raw": "", "latency_ms": 0, "error": str(e)}
+    start = time.time()
+    response = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Classify this input:\n\n{prompt[:800]}"}
+        ],
+        max_tokens=10,
+        temperature=0.0,
+    )
+    latency = (time.time() - start) * 1000
+    
+    text = (response.choices[0].message.content or "").strip().lower()
+    
+    if "adversarial" in text or "malicious" in text or "jailbreak" in text:
+        prediction = "adversarial"
+    elif "benign" in text or "safe" in text:
+        prediction = "benign"
+    else:
+        raise ValueError(f"Unexpected classifier output from {model_id}: {text!r}")
+    
+    return {"prediction": prediction, "raw": text, "latency_ms": round(latency, 2), "error": None}
 
 
 # ─── Main Evaluation ─────────────────────────────────────────────────────────
@@ -136,7 +118,7 @@ def load_test_data(n_samples: int = 200) -> list[dict]:
     """Load balanced test data."""
     test_path = DATA_DIR / "test.jsonl"
     if not test_path.exists():
-        raise FileNotFoundError(f"Run data/collect_datasets.py first")
+        raise FileNotFoundError(f"Missing {test_path}; prepare newDataset/processed/test.jsonl first")
     
     import random
     

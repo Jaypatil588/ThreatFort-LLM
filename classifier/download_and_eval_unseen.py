@@ -35,7 +35,7 @@ else:
 
 PROJECT_ROOT = Path(__file__).parent.parent
 ADAPTER_PATH = PROJECT_ROOT / "models" / "classifier" / "final_adapter"
-UNSEEN_DIR   = PROJECT_ROOT / "data" / "unseen_validation"
+UNSEEN_DIR   = PROJECT_ROOT / "newDataset" / "unseen_validation"
 
 INFERENCE_TEMPLATE = (
     "System: You are a security classifier. "
@@ -53,22 +53,19 @@ def download_toxic_chat():
     """lmsys/toxic-chat — real user convos from Vicuna/ChatGPT labeled toxic/jailbreak."""
     print("\n[1/4] Downloading lmsys/toxic-chat ...")
     samples = []
-    try:
-        ds = load_dataset("lmsys/toxic-chat", "toxicchat0124", split="test")
-        for item in ds:
-            text = item.get("user_input", "")
-            if not text or len(text) < 15:
-                continue
-            is_jailbreak = item.get("jailbreaking", 0) == 1
-            is_toxic = item.get("toxicity", 0) == 1
-            if is_jailbreak:
-                samples.append({"prompt": text[:2000], "label": "adversarial",
-                                "attack_type": "jailbreak", "source": "toxic_chat"})
-            elif not is_toxic:
-                samples.append({"prompt": text[:2000], "label": "benign",
-                                "attack_type": "none", "source": "toxic_chat"})
-    except Exception as e:
-        print(f"  Error: {e}")
+    ds = load_dataset("lmsys/toxic-chat", "toxicchat0124", split="test")
+    for item in ds:
+        text = item.get("user_input", "")
+        if not text or len(text) < 15:
+            continue
+        is_jailbreak = item.get("jailbreaking", 0) == 1
+        is_toxic = item.get("toxicity", 0) == 1
+        if is_jailbreak:
+            samples.append({"prompt": text[:2000], "label": "adversarial",
+                            "attack_type": "jailbreak", "source": "toxic_chat"})
+        elif not is_toxic:
+            samples.append({"prompt": text[:2000], "label": "benign",
+                            "attack_type": "none", "source": "toxic_chat"})
     print(f"  Got {len(samples)} samples ({sum(1 for s in samples if s['label']=='adversarial')} adv, {sum(1 for s in samples if s['label']=='benign')} benign)")
     return samples
 
@@ -77,21 +74,18 @@ def download_jailbreakbench():
     """JailbreakBench/JBB-Behaviors — curated jailbreak goal prompts."""
     print("\n[2/4] Downloading JailbreakBench/JBB-Behaviors ...")
     samples = []
-    try:
-        ds = load_dataset("JailbreakBench/JBB-Behaviors", "behaviors", split="harmful")
-        for item in ds:
-            goal = item.get("Goal", item.get("goal", ""))
-            if goal and len(goal) > 10:
-                samples.append({"prompt": goal[:2000], "label": "adversarial",
-                                "attack_type": "jailbreak", "source": "jailbreakbench"})
-        ds_benign = load_dataset("JailbreakBench/JBB-Behaviors", "behaviors", split="benign")
-        for item in ds_benign:
-            goal = item.get("Goal", item.get("goal", ""))
-            if goal and len(goal) > 10:
-                samples.append({"prompt": goal[:2000], "label": "benign",
-                                "attack_type": "none", "source": "jailbreakbench"})
-    except Exception as e:
-        print(f"  Error: {e}")
+    ds = load_dataset("JailbreakBench/JBB-Behaviors", "behaviors", split="harmful")
+    for item in ds:
+        goal = item.get("Goal", item.get("goal", ""))
+        if goal and len(goal) > 10:
+            samples.append({"prompt": goal[:2000], "label": "adversarial",
+                            "attack_type": "jailbreak", "source": "jailbreakbench"})
+    ds_benign = load_dataset("JailbreakBench/JBB-Behaviors", "behaviors", split="benign")
+    for item in ds_benign:
+        goal = item.get("Goal", item.get("goal", ""))
+        if goal and len(goal) > 10:
+            samples.append({"prompt": goal[:2000], "label": "benign",
+                            "attack_type": "none", "source": "jailbreakbench"})
     print(f"  Got {len(samples)} adversarial samples")
     return samples
 
@@ -100,15 +94,12 @@ def download_simple_safety_tests():
     """Bertievidgen/SimpleSafetyTests — 100 clear-cut unsafe prompts."""
     print("\n[3/4] Downloading SimpleSafetyTests ...")
     samples = []
-    try:
-        ds = load_dataset("Bertievidgen/SimpleSafetyTests", split="test")
-        for item in ds:
-            prompt = item.get("prompt", "")
-            if prompt and len(prompt) > 10:
-                samples.append({"prompt": prompt[:2000], "label": "adversarial",
-                                "attack_type": "direct_harm", "source": "simple_safety_tests"})
-    except Exception as e:
-        print(f"  Error: {e}")
+    ds = load_dataset("Bertievidgen/SimpleSafetyTests", split="test")
+    for item in ds:
+        prompt = item.get("prompt", "")
+        if prompt and len(prompt) > 10:
+            samples.append({"prompt": prompt[:2000], "label": "adversarial",
+                            "attack_type": "direct_harm", "source": "simple_safety_tests"})
     print(f"  Got {len(samples)} adversarial samples")
     return samples
 
@@ -117,15 +108,12 @@ def download_harmbench():
     """walledai/HarmBench — multi-category harmful behavior benchmark."""
     print("\n[4/4] Downloading HarmBench ...")
     samples = []
-    try:
-        ds = load_dataset("walledai/HarmBench", split="train")
-        for item in ds:
-            prompt = item.get("prompt", item.get("behavior", ""))
-            if prompt and len(prompt) > 10:
-                samples.append({"prompt": prompt[:2000], "label": "adversarial",
-                                "attack_type": "harmbench", "source": "harmbench"})
-    except Exception as e:
-        print(f"  Error: {e}")
+    ds = load_dataset("walledai/HarmBench", split="train")
+    for item in ds:
+        prompt = item.get("prompt", item.get("behavior", ""))
+        if prompt and len(prompt) > 10:
+            samples.append({"prompt": prompt[:2000], "label": "adversarial",
+                            "attack_type": "harmbench", "source": "harmbench"})
     print(f"  Got {len(samples)} adversarial samples")
     return samples
 
