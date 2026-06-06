@@ -52,5 +52,6 @@
   ],
   "base_model": "meta-llama/Llama-3.2-3B-Instruct",
   "training_notebook": "test.ipynb",
+  "training_objective": "sequence_classification",
   "dataset_root": "newDataset"
 }

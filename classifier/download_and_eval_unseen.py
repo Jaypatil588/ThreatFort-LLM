@@ -20,7 +20,7 @@ import torch
 from dotenv import load_dotenv
 from huggingface_hub import login
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from peft import PeftModel
 from tqdm import tqdm
 
@@ -37,13 +37,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 ADAPTER_PATH = PROJECT_ROOT / "models" / "classifier" / "final_adapter"
 UNSEEN_DIR   = PROJECT_ROOT / "newDataset" / "unseen_validation"
 
-INFERENCE_TEMPLATE = (
-    "System: You are a security classifier. "
-    "Answer with just 'adversarial' or 'benign'.\n"
-    "User: {prompt}\n"
-    "Assistant:"
-)
-
+LABEL_TO_ID = {"benign": 0, "adversarial": 1}
+ID_TO_LABEL = {0: "benign", 1: "adversarial"}
+MAX_SEQ_LENGTH = 512
 random.seed(42)
 
 
@@ -129,34 +125,40 @@ def load_model():
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     print(f"\nLoading model {base_id} on {device} ...")
 
-    model = AutoModelForCausalLM.from_pretrained(
-        base_id, torch_dtype=torch.float32, device_map={"": device})
-    model = PeftModel.from_pretrained(model, adapter_path)
-    model = model.merge_and_unload()
-    model.eval()
-
     tokenizer = AutoTokenizer.from_pretrained(adapter_path)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    model = AutoModelForSequenceClassification.from_pretrained(
+        base_id,
+        num_labels=2,
+        id2label=ID_TO_LABEL,
+        label2id=LABEL_TO_ID,
+        torch_dtype=torch.float32,
+        device_map={"": device},
+    )
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model = PeftModel.from_pretrained(model, adapter_path)
+    model = model.merge_and_unload()
+    model.eval()
 
     return model, tokenizer, device
 
 
 def classify(model, tokenizer, device, prompt):
-    input_text = INFERENCE_TEMPLATE.format(prompt=prompt[:800])
-    inputs = tokenizer(input_text, return_tensors="pt").to(device)
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=MAX_SEQ_LENGTH,
+    ).to(device)
     start = time.time()
     with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=5, do_sample=False)
+        outputs = model(**inputs)
     latency_ms = (time.time() - start) * 1000
-    new_tokens = outputs[0][inputs["input_ids"].shape[1]:]
-    raw = tokenizer.decode(new_tokens, skip_special_tokens=True).strip().lower()
-    if "adversarial" in raw:
-        return "adversarial", raw, latency_ms
-    elif "benign" in raw:
-        return "benign", raw, latency_ms
-    else:
-        return "unknown", raw, latency_ms
+    pred_id = int(outputs.logits.argmax(dim=-1).item())
+    raw = [round(float(x), 4) for x in outputs.logits[0].detach().cpu()]
+    return ID_TO_LABEL[pred_id], raw, latency_ms
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────

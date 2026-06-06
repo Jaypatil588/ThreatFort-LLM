@@ -10,7 +10,7 @@ from collections import defaultdict
 
 import torch
 from dotenv import load_dotenv
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from peft import PeftModel
 from tqdm import tqdm
 from groq import Groq
@@ -30,12 +30,9 @@ ADAPTER_PATH = PROJECT_ROOT / "models" / "classifier" / "final_adapter"
 
 BASE_MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 
-EVAL_TEMPLATE = (
-    "System: You are a security classifier. "
-    "Answer with just 'adversarial' or 'benign'.\n"
-    "User: {prompt}\n"
-    "Assistant:"
-)
+LABEL_TO_ID = {"benign": 0, "adversarial": 1}
+ID_TO_LABEL = {0: "benign", 1: "adversarial"}
+MAX_SEQ_LENGTH = 512
 
 # 23 Sub-Attack definitions matching prompt_attack_taxonomy.md
 SUB_ATTACK_TYPES = {
@@ -275,11 +272,13 @@ def prep_splits():
 # --- Model Classification Helper (MPS/CPU local) ---
 def load_eval_model(adapter_path=None):
     device = "mps" if torch.backends.mps.is_available() else "cpu"
-    print(f"Loading Llama 3.2 3B on {device}...")
+    print(f"Loading Llama 3.2 3B sequence classifier on {device}...")
     
-    # Load base model in bfloat16 for speed and VRAM savings on Mac
-    model = AutoModelForCausalLM.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         BASE_MODEL_ID,
+        num_labels=2,
+        id2label=ID_TO_LABEL,
+        label2id=LABEL_TO_ID,
         torch_dtype=torch.bfloat16,
         device_map={"": device}
     )
@@ -290,9 +289,10 @@ def load_eval_model(adapter_path=None):
         model = model.merge_and_unload()
         
     model.eval()
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID)
+    tokenizer = AutoTokenizer.from_pretrained(str(adapter_path) if adapter_path else BASE_MODEL_ID)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    model.config.pad_token_id = tokenizer.pad_token_id
         
     return model, tokenizer, device
 
@@ -314,31 +314,20 @@ def run_evaluation(model, tokenizer, device, test_filepath, run_id):
         true_label = sample["label"]
         attack_type = sample.get("attack_type", "none")
         
-        # Format inference prompt
-        input_text = EVAL_TEMPLATE.format(prompt=prompt[:800])
-        inputs = tokenizer(input_text, return_tensors="pt").to(device)
+        inputs = tokenizer(
+            prompt,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_LENGTH,
+        ).to(device)
         
         start = time.time()
         with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=5,
-                do_sample=False,
-                pad_token_id=tokenizer.eos_token_id
-            )
+            outputs = model(**inputs)
         latency_ms = (time.time() - start) * 1000
         latencies.append(latency_ms)
         
-        new_tokens = outputs[0][inputs["input_ids"].shape[1]:]
-        raw = tokenizer.decode(new_tokens, skip_special_tokens=True).strip().lower()
-        
-        # Normalization
-        if "adversarial" in raw:
-            pred_label = "adversarial"
-        elif "benign" in raw:
-            pred_label = "benign"
-        else:
-            pred_label = "unknown"
+        pred_label = ID_TO_LABEL[int(outputs.logits.argmax(dim=-1).item())]
             
         hit = pred_label == true_label
         if hit:

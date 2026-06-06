@@ -1,57 +1,65 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
 import argparse
+import json
+import time
+from pathlib import Path
 
-def format_prompt(text: str) -> str:
-    return f"System: You are a security classifier. Answer with just 'adversarial' or 'benign'.\nUser: {text}\nAssistant:"
+import torch
+from peft import PeftModel
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+LABEL_TO_ID = {"benign": 0, "adversarial": 1}
+ID_TO_LABEL = {0: "benign", 1: "adversarial"}
+MAX_SEQ_LENGTH = 512
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run fine-tuned classifier offline on Mac")
     parser.add_argument("--prompt", type=str, required=True, help="The prompt to test")
-    parser.add_argument("--adapter-dir", type=str, default="models/classifier/final_adapter", help="Path to your unzipped Colab adapter")
+    parser.add_argument("--adapter-dir", type=str, default="models/classifier/final_adapter", help="Path to your adapter")
     args = parser.parse_args()
 
     if not torch.backends.mps.is_available():
         raise RuntimeError("MPS is required for this local inference script.")
     device = "mps"
-    print(f"Loading using device: {device}...")
 
-    base_model_id = "meta-llama/Llama-3.2-3B-Instruct"
-    tokenizer = AutoTokenizer.from_pretrained(base_model_id)
-    
-    model = AutoModelForCausalLM.from_pretrained(
+    adapter_config_path = Path(args.adapter_dir) / "adapter_config.json"
+    with open(adapter_config_path, encoding="utf-8") as f:
+        adapter_config = json.load(f)
+    base_model_id = adapter_config["base_model_name_or_path"]
+
+    tokenizer = AutoTokenizer.from_pretrained(args.adapter_dir)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    model = AutoModelForSequenceClassification.from_pretrained(
         base_model_id,
+        num_labels=2,
+        id2label=ID_TO_LABEL,
+        label2id=LABEL_TO_ID,
         torch_dtype=torch.bfloat16,
-        device_map={"": device}
+        device_map={"": device},
     )
-
-    # Attach your trained adapter
-    print(f"Attaching your custom adapter from {args.adapter_dir}...")
+    model.config.pad_token_id = tokenizer.pad_token_id
     model = PeftModel.from_pretrained(model, args.adapter_dir)
-        
-    print("\nModel loaded successfully! Running inference...\n")
+    model.eval()
 
-    formatted = format_prompt(args.prompt)
-    inputs = tokenizer(formatted, return_tensors="pt").to(device)
+    inputs = tokenizer(
+        args.prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=MAX_SEQ_LENGTH,
+    ).to(device)
 
-    # Generate response
+    start = time.time()
     with torch.no_grad():
-        outputs = model.generate(
-            **inputs, 
-            max_new_tokens=5,     # We only need 1 word ('adversarial' or 'benign')
-            temperature=0.0,      # Deterministic 
-            pad_token_id=tokenizer.eos_token_id
-        )
+        outputs = model(**inputs)
+    latency_ms = (time.time() - start) * 1000
 
-    # Decode and extract just the answer
-    result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    answer = result.split("Assistant:")[-1].strip().lower()
+    pred_id = int(outputs.logits.argmax(dim=-1).item())
+    logits = [round(float(x), 4) for x in outputs.logits[0].detach().cpu()]
 
-    print("="*50)
-    print(f"Prompt: '{args.prompt}'")
-    print(f"Classification: [ {answer.upper()} ]")
-    print("="*50)
+    print(pred_id)
+
 
 if __name__ == "__main__":
     main()

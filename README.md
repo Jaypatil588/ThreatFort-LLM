@@ -7,7 +7,7 @@ ThreatFort-LLM evaluates LLM robustness against adversarial prompt attacks and t
 ## Overview
 
 1. **Multi-Attack Benchmark**: evaluation against GCG, AutoDAN, PAIR, and the expanded prompt-attack taxonomy.
-2. **Adversarial Prompt Classifier**: a Llama 3.2 3B Instruct QLoRA classifier trained from `test.ipynb` on `newDataset/processed`.
+2. **Adversarial Prompt Classifier**: a Llama 3.2 3B Instruct QLoRA sequence classifier trained from `test.ipynb` on `newDataset/processed`.
 
 ## Current Training Flow
 
@@ -101,10 +101,12 @@ python3 benchmark/evaluate.py --n-adversarial 100 --n-benign 50
 | Parameter | Value |
 |-----------|-------|
 | Base model | `meta-llama/Llama-3.2-3B-Instruct` |
-| Training method | QLoRA |
+| Training method | QLoRA sequence classification |
 | Quantization | 4-bit NF4 + double quantization |
 | LoRA rank | 16 |
 | LoRA alpha | 32 |
+| Input | `prompt` only |
+| Target | binary `label` only: `0` benign, `1` adversarial |
 | Target modules | all linear modules in `test.ipynb` |
 | Epochs | up to 5 with early stopping |
 | Effective batch size | 16 |
