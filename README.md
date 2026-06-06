@@ -90,7 +90,26 @@ or:
 python3 classifier/evaluate_adapter.py
 ```
 
-### 4. Run Benchmark
+### 4. Virgin Baselines
+
+Before fine-tuning, evaluate the unfine-tuned baselines on `newDataset/processed/test.jsonl`:
+
+```text
+baseline_evaluation.ipynb
+```
+
+Run that notebook in Colab before running `test.ipynb`. It clones the repo, copies `newDataset/processed/test.jsonl` into the Colab runtime, evaluates both virgin models, and writes:
+
+```text
+/content/threatfort_baseline_runtime/virgin_baselines.json
+```
+
+Interpretation:
+
+- `modernbert_base_random_head`: ModernBERT-base with an untrained classifier head. This is a random-head sanity floor.
+- `llama32_3b_zero_shot`: Llama 3.2 3B Instruct prompted to emit exactly `0` or `1` without fine-tuning.
+
+### 5. Run Benchmark
 
 ```bash
 python3 benchmark/evaluate.py --n-adversarial 100 --n-benign 50
