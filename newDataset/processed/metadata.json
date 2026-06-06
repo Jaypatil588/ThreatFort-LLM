@@ -1,27 +1,56 @@
 {
-  "total_samples": 5173,
+  "total_samples": 9198,
   "label_distribution": {
-    "adversarial": 2673,
-    "benign": 2500
+    "adversarial": 4691,
+    "benign": 4507
   },
   "attack_distribution": {
+    "none": 2500,
     "gcg": 1912,
-    "autodan": 341,
     "pair": 420,
-    "none": 2500
+    "autodan": 341,
+    "low_resource_translation": 320,
+    "prefix_forcing": 266,
+    "preflight_hijack": 266,
+    "virtualization": 248,
+    "token_splitting": 228,
+    "incremental_escalation": 222,
+    "developer_mode": 216,
+    "narrative_wrapping": 200,
+    "semantic_redefinition": 196,
+    "roleplay_history": 194,
+    "formatting_constraints": 194,
+    "hypothetical_framing": 182,
+    "system_override": 173,
+    "cryptographic_ciphers": 172,
+    "unrestricted_persona": 163,
+    "gcg_optimization": 149,
+    "invisible_css_font": 130,
+    "emotional_manipulation": 126,
+    "refusal_emulation": 124,
+    "instruction_poisoning": 94,
+    "lost_in_the_middle": 84,
+    "binary_hex_base64": 68,
+    "utility_paradox": 10
   },
   "split_sizes": {
-    "train": 4138,
-    "val": 517,
-    "test": 518
+    "train": 7341,
+    "val": 914,
+    "test": 943
   },
   "sources": [
-    "pair_synthetic",
-    "prompt_injections",
+    "advbench",
+    "advbench_suffixed",
+    "alpaca",
     "autodan_synthetic",
     "chatgpt_jailbreaks",
-    "alpaca",
-    "advbench",
-    "advbench_suffixed"
-  ]
+    "groq_synthetic_taxonomy",
+    "local_benign_pairing",
+    "manual_curation_dashboard",
+    "pair_synthetic",
+    "prompt_injections"
+  ],
+  "base_model": "meta-llama/Llama-3.2-3B-Instruct",
+  "training_notebook": "test.ipynb",
+  "dataset_root": "newDataset"
 }
