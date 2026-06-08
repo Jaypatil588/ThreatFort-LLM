@@ -20,3 +20,7 @@ run_nb.py
 raw_nb_test.py
 tmp_test.py
 .DS_Store
+
+# Fine-tuning notebooks (contain hardcoded tokens — do NOT commit)
+modernBERT-finetune.ipynb
+llama-finetune.ipynb

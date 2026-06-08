@@ -42,6 +42,7 @@ threatfort/
 │   ├── evaluate_adapter.py
 │   ├── offline_inference.py
 │   └── download_and_eval_unseen.py
+
 ├── newDataset/
 │   ├── processed/
 │   ├── prompt_attack_groq_data/
@@ -49,7 +50,15 @@ threatfort/
 ├── reports/
 │   ├── prompt_attack_taxonomy.md
 │   └── prompt_dataset_balancing_report.md
-├── test.ipynb
+├── scripts/
+│   ├── check_syntax.py
+│   ├── fix_cell.py
+│   ├── show_all_cells.py
+│   └── show_last_cells.py
+├── test.ipynb                         ← original Llama QLoRA trainer
+├── modernBERT-finetune.ipynb          ← ModernBERT fine-tuning (gitignored)
+├── llama-finetune.ipynb               ← Llama QLoRA fine-tuning (gitignored)
+├── baseline_evaluation.ipynb
 ├── results/
 └── requirements.txt
 ```
@@ -98,7 +107,7 @@ Before fine-tuning, evaluate the unfine-tuned baselines on `newDataset/processed
 baseline_evaluation.ipynb
 ```
 
-Run that notebook in Colab before running `test.ipynb`. It clones the repo, copies `newDataset/processed/test.jsonl` into the Colab runtime, evaluates both virgin models, and writes:
+Run that notebook in Colab before running the fine-tuning notebooks. It clones the repo, copies `newDataset/processed/test.jsonl` into the Colab runtime, evaluates both virgin models, and writes:
 
 ```text
 /content/threatfort_baseline_runtime/virgin_baselines.json
@@ -109,7 +118,34 @@ Interpretation:
 - `modernbert_base_random_head`: ModernBERT-base with an untrained classifier head. This is a random-head sanity floor.
 - `llama32_3b_zero_shot`: Llama 3.2 3B Instruct prompted to emit exactly `0` or `1` without fine-tuning.
 
-### 5. Run Benchmark
+### 5. Fine-Tune Models
+
+After establishing baselines, fine-tune both models using separate Colab notebooks.
+
+**Note:** These notebooks contain hardcoded tokens and are gitignored. Do not commit them.
+
+#### ModernBERT (`modernBERT-finetune.ipynb`)
+
+- **Method:** Full fine-tuning with `AutoModelForSequenceClassification(num_labels=2)`
+- **Model:** `answerdotai/ModernBERT-base` (149M params)
+- **Hyperparameters:** lr=2e-5, batch=16, epochs≤5 (early stopping patience=2), cosine scheduler
+- **Output:** Full model weights pushed directly to Hugging Face Hub
+
+#### Llama 3.2 3B (`llama-finetune.ipynb`)
+
+- **Method:** QLoRA SFT with `SFTTrainer`
+- **Model:** `meta-llama/Llama-3.2-3B-Instruct` (4-bit NF4)
+- **Hyperparameters:** lr=2e-4, effective batch=16, LoRA r=16 α=32, epochs≤5 (early stopping patience=1)
+- **Output:** LoRA adapter pushed directly to Hugging Face Hub
+
+Both notebooks:
+1. Clone the repo and copy `newDataset/processed/*.jsonl` to the Colab runtime
+2. Train with early stopping
+3. Evaluate on the test split (classification report, confusion matrix, per-attack-type accuracy)
+4. Auto-push trained weights/adapter and eval metrics to your Hugging Face account
+5. Download a zip backup locally
+
+### 6. Run Benchmark
 
 ```bash
 python3 benchmark/evaluate.py --n-adversarial 100 --n-benign 50
